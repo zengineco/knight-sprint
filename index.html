@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="description" content="KnightSprint++ — simultaneous-turn knight's tour strategy game. Chess meets Tron."/>
+  <meta name="theme-color" content="#0c0e1a"/>
+  <title>KnightSprint++</title>
+  <link rel="stylesheet" href="styles.css"/>
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="KnightSprint++"/>
+  <meta property="og:description" content="Simultaneous-turn knight strategy. Chess meets Tron."/>
+  <meta property="og:type"        content="website"/>
+</head>
+<body>
+
+<!-- Accessibility: live region for screen reader announcements -->
+<div id="aria-live" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<div class="app">
+
+  <!-- ── Header ─────────────────────────────────────────────────── -->
+  <header>
+    <div>
+      <div class="logo">
+        KnightSprint
+        <span class="logo-plus">++</span>
+      </div>
+      <span class="logo-sub">SIMULTANEOUS KNIGHT STRATEGY</span>
+    </div>
+
+    <div class="header-right">
+      <button class="btn btn-ghost" id="btn-settings" aria-label="New game settings">
+        ⚙ NEW GAME
+      </button>
+      <button class="btn btn-ghost" id="btn-export" aria-label="Export game state">
+        ↓ EXPORT
+      </button>
+      <button class="btn btn-ghost" id="btn-motion" aria-label="Toggle reduced motion"
+              title="Reduced Motion">◐</button>
+    </div>
+  </header>
+
+  <!-- ── Main Stage ──────────────────────────────────────────────── -->
+  <div class="main-stage">
+
+    <!-- Board Column -->
+    <div class="board-wrap">
+      <!-- Phase indicator -->
+      <div id="phase-label" class="phase-label phase-select" role="status">
+        SELECT YOUR MOVE
+      </div>
+
+      <!-- Timer (hidden by default) -->
+      <div id="timer-wrap" class="hidden w-full">
+        <div class="timer-bar" role="progressbar" aria-label="Turn timer">
+          <div id="timer-bar-fill"></div>
+        </div>
+      </div>
+
+      <!-- Game Board -->
+      <div id="board"
+           role="grid"
+           aria-label="Game board"
+           aria-live="off">
+        <!-- Cells injected by JS -->
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" aria-label="Game information">
+
+      <!-- Scoreboard -->
+      <div class="panel">
+        <div class="panel-title">⚔ Standings</div>
+        <div id="scoreboard" role="table" aria-label="Player scores">
+          <!-- Injected by ui.js -->
+        </div>
+      </div>
+
+      <!-- Confirm move -->
+      <div class="panel">
+        <div class="panel-title">🎯 Action</div>
+        <button class="btn btn-confirm" id="btn-confirm" disabled
+                aria-label="Confirm selected move">
+          SELECT A SQUARE
+        </button>
+        <p class="text-dim mt-4" style="font-size:10px;line-height:1.6">
+          Tap a highlighted square, then confirm. All moves resolve simultaneously.
+        </p>
+      </div>
+
+      <!-- Seed / Status -->
+      <div class="panel">
+        <div class="panel-title">📡 Run Data</div>
+        <div id="status-text" class="text-dim" aria-live="polite">—</div>
+      </div>
+
+      <!-- Controls -->
+      <div class="panel">
+        <div class="panel-title">⌨ Controls</div>
+        <div class="controls-hint">
+          <div class="hint-row"><span>Select move</span><span><kbd>Tab / →</kbd></span></div>
+          <div class="hint-row"><span>Confirm</span><span><kbd>Enter</kbd></span></div>
+          <div class="hint-row"><span>Deselect</span><span><kbd>Esc</kbd></span></div>
+          <div class="hint-row"><span>Touch</span><span>Tap square</span></div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="panel">
+        <div class="panel-title">🗺 Legend</div>
+        <div class="legend-grid">
+          <div class="legend-swatch" style="background:rgba(240,165,0,0.4);border:1.5px solid rgba(240,165,0,0.6);border-radius:50%"></div>
+          <span>Legal move</span>
+          <div class="legend-swatch" style="background:rgba(240,165,0,0.18);border:1.5px solid rgba(240,165,0,0.6)"></div>
+          <span>Selected</span>
+          <div class="legend-swatch" style="background:rgba(240,165,0,0.15)"></div>
+          <span>P1 trail</span>
+          <div class="legend-swatch" style="background:rgba(68,180,255,0.15)"></div>
+          <span>P2 trail</span>
+          <div class="legend-swatch" style="background:#1a0a0a;border:1px solid #332"></div>
+          <span>Obstacle</span>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- ── Footer ──────────────────────────────────────────────────── -->
+  <footer>
+    <div class="footer-left">
+      <button class="btn btn-primary" id="btn-confirm-footer" disabled aria-hidden="true">
+        CONFIRM MOVE
+      </button>
+    </div>
+    <div class="footer-right">
+      KnightSprint++ · Chess meets Tron · <a href="https://github.com" style="color:var(--text-dim)" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </footer>
+
+</div><!-- .app -->
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SETUP MODAL
+════════════════════════════════════════════════════════════════ -->
+<div id="setup-panel" class="modal-backdrop visible" role="dialog"
+     aria-modal="true" aria-labelledby="setup-title">
+  <div class="modal">
+    <h2 class="modal-title" id="setup-title">Configure Run</h2>
+
+    <form id="setup-form" novalidate>
+
+      <!-- Board Size -->
+      <div class="form-row">
+        <label>Board Size</label>
+        <div class="radio-group" role="radiogroup" aria-label="Board size">
+          <div class="radio-chip">
+            <input type="radio" name="board-size" id="bs8" value="8" checked/>
+            <label for="bs8">8×8</label>
+          </div>
+          <div class="radio-chip">
+            <input type="radio" name="board-size" id="bs10" value="10"/>
+            <label for="bs10">10×10</label>
+          </div>
+          <div class="radio-chip">
+            <input type="radio" name="board-size" id="bs12" value="12"/>
+            <label for="bs12">12×12</label>
+          </div>
+          <div class="radio-chip">
+            <input type="radio" name="board-size" id="bs14" value="14"/>
+            <label for="bs14">14×14</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Players -->
+      <div class="form-row">
+        <label>Human Players</label>
+        <div class="radio-group" role="radiogroup" aria-label="Human player count">
+          <div class="radio-chip">
+            <input type="radio" name="player-count" id="pc1" value="1" checked/>
+            <label for="pc1">1</label>
+          </div>
+          <div class="radio-chip">
+            <input type="radio" name="player-count" id="pc2" value="2"/>
+            <label for="pc2">2</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- CPU Opponents -->
+      <div class="form-row">
+        <label for="cpu-count">CPU Opponents</label>
+        <select name="cpu-count" id="cpu-count">
+          <option value="1" selected>1 CPU</option>
+          <option value="2">2 CPU</option>
+          <option value="3">3 CPU</option>
+        </select>
+      </div>
+
+      <hr class="form-divider"/>
+
+      <!-- AI Strategy -->
+      <div class="form-row">
+        <label>AI Strategy</label>
+        <div class="radio-group" role="radiogroup" aria-label="AI strategy">
+          <div class="radio-chip">
+            <input type="radio" name="ai-strategy" id="ai-mob" value="mobility" checked/>
+            <label for="ai-mob">Mobility</label>
+          </div>
+          <div class="radio-chip">
+            <input type="radio" name="ai-strategy" id="ai-agg" value="aggressor"/>
+            <label for="ai-agg">Aggressor</label>
+          </div>
+          <div class="radio-chip">
+            <input type="radio" name="ai-strategy" id="ai-bal" value="balanced"/>
+            <label for="ai-bal">Balanced</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timer -->
+      <div class="form-row">
+        <label for="timer">Turn Timer</label>
+        <select name="timer" id="timer">
+          <option value="0" selected>No timer</option>
+          <option value="10">10 seconds</option>
+          <option value="20">20 seconds</option>
+          <option value="30">30 seconds</option>
+        </select>
+      </div>
+
+      <!-- Obstacles -->
+      <div class="form-row">
+        <label for="obstacles">Obstacles</label>
+        <select name="obstacles" id="obstacles">
+          <option value="0" selected>None</option>
+          <option value="4">4 obstacles</option>
+          <option value="8">8 obstacles</option>
+          <option value="16">16 obstacles</option>
+        </select>
+      </div>
+
+      <hr class="form-divider"/>
+
+      <!-- Seed -->
+      <div class="form-row">
+        <label for="seed">Seed <span class="text-dim">(deterministic replay)</span></label>
+        <div class="seed-row">
+          <div class="form-row">
+            <input type="number" name="seed" id="seed" placeholder="auto" min="0" max="999999"/>
+          </div>
+          <button type="button" class="btn btn-ghost" id="btn-random-seed"
+                  style="height:40px;padding:0 12px;white-space:nowrap">
+            🎲 Random
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary form-submit">
+        ⚔ START GAME
+      </button>
+
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     GAME OVER OVERLAY
+════════════════════════════════════════════════════════════════ -->
+<div id="gameover-overlay" class="hidden" role="dialog"
+     aria-modal="true" aria-labelledby="gameover-title">
+  <div class="gameover-box">
+    <h2 id="gameover-title" style="color:var(--c-amber)">GAME OVER</h2>
+    <p id="gameover-result" class="text-dim mt-4"></p>
+    <div id="gameover-table" class="mt-8"></div>
+    <div class="go-actions">
+      <button class="btn btn-primary" id="btn-rematch">⚔ REMATCH</button>
+      <button class="btn btn-ghost"   id="btn-newgame">⚙ NEW GAME</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SCRIPTS (ES Modules)
+════════════════════════════════════════════════════════════════ -->
+<script type="module">
+import { startGame }    from './game.js';
+import { showSetupPanel, hideSetupPanel, updateConfirmButton } from './ui.js';
+
+// ── Wire up setup form ─────────────────────────────────────────
+const setupForm  = document.getElementById('setup-form');
+const setupPanel = document.getElementById('setup-panel');
+
+setupForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const data = new FormData(setupForm);
+
+  const seedInput = data.get('seed');
+  const seed = seedInput ? parseInt(seedInput) : Math.floor(Math.random() * 99999);
+
+  const config = {
+    boardSize:     parseInt(data.get('board-size') || '8'),
+    playerCount:   parseInt(data.get('player-count') || '1') + parseInt(data.get('cpu-count') || '1'),
+    cpuCount:      parseInt(data.get('cpu-count') || '1'),
+    seed,
+    timerSeconds:  parseInt(data.get('timer') || '0'),
+    obstacleCount: parseInt(data.get('obstacles') || '0'),
+    aiStrategy:    data.get('ai-strategy') || 'mobility',
+  };
+
+  // Update seed display
+  document.getElementById('seed').value = seed;
+
+  setupPanel.classList.remove('visible');
+  setupPanel.classList.add('hidden');
+
+  startGame(config);
+});
+
+// ── Random seed ────────────────────────────────────────────────
+document.getElementById('btn-random-seed').addEventListener('click', () => {
+  document.getElementById('seed').value = Math.floor(Math.random() * 99999);
+});
+
+// ── Header buttons ─────────────────────────────────────────────
+document.getElementById('btn-settings').addEventListener('click', () => {
+  setupPanel.classList.toggle('hidden');
+  setupPanel.classList.toggle('visible');
+});
+
+document.getElementById('btn-export').addEventListener('click', () => {
+  const data = window._KS?.serialize();
+  if (!data) return;
+  const blob = new Blob([data], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `knightsprint-seed-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('btn-motion').addEventListener('click', () => {
+  document.documentElement.classList.toggle('reduced-motion');
+});
+
+// ── Confirm buttons (header + footer mirror) ──────────────────
+function syncConfirm() {
+  const main   = document.getElementById('btn-confirm');
+  const footer = document.getElementById('btn-confirm-footer');
+  footer.disabled = main.disabled;
+  footer.textContent = main.textContent;
+}
+const confirmObserver = new MutationObserver(syncConfirm);
+confirmObserver.observe(document.getElementById('btn-confirm'), {
+  attributes: true, childList: true, characterData: true
+});
+
+document.getElementById('btn-confirm').addEventListener('click', () => {
+  // game.js wires this via DOM — re-dispatch
+});
+document.getElementById('btn-confirm-footer').addEventListener('click', () => {
+  document.getElementById('btn-confirm').click();
+});
+
+// ── Game over actions ──────────────────────────────────────────
+document.getElementById('btn-rematch').addEventListener('click', () => {
+  document.getElementById('gameover-overlay').classList.replace('visible','hidden');
+  // Replay same seed
+  const seedVal = parseInt(document.getElementById('seed').value) || 42;
+  const form = document.getElementById('setup-form');
+  const data = new FormData(form);
+  startGame({
+    boardSize:     parseInt(data.get('board-size') || '8'),
+    playerCount:   parseInt(data.get('player-count') || '1') + parseInt(data.get('cpu-count') || '1'),
+    cpuCount:      parseInt(data.get('cpu-count') || '1'),
+    seed:          seedVal,
+    timerSeconds:  parseInt(data.get('timer') || '0'),
+    obstacleCount: parseInt(data.get('obstacles') || '0'),
+  });
+});
+
+document.getElementById('btn-newgame').addEventListener('click', () => {
+  document.getElementById('gameover-overlay').classList.replace('visible','hidden');
+  setupPanel.classList.replace('hidden','visible');
+});
+
+// ── Confirm button wiring (game.js publishes handler) ─────────
+document.getElementById('btn-confirm').addEventListener('click', () => {
+  window._KS_handleConfirm?.();
+});
+</script>
+
+</body>
+</html>
